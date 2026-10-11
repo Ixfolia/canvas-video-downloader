@@ -7,6 +7,9 @@ const STATE_AREA_NAME = api.storage.session ? 'session' : 'local';
 const $ = (id) => document.getElementById(id);
 
 let activeTab = null;
+// popup.html?tabId=N shows a specific tab's list in a normal tab. That is the
+// fallback when the toolbar popup can't be used (see Options -> Diagnostics).
+const forcedTabId = Number(new URLSearchParams(location.search).get('tabId')) || null;
 let tabState = null;
 let settings = { ...CVS.DEFAULT_SETTINGS };
 let hasPermission = true;
@@ -194,7 +197,7 @@ async function download(v, force) {
 async function openHlsDownloader(v, base) {
   const params = new URLSearchParams({ tabId: String(activeTab.id), key: v.key, name: base });
   await api.tabs.create({ url: api.runtime.getURL('hls.html') + '?' + params, index: activeTab.index + 1 });
-  window.close();
+  if (!forcedTabId) window.close();
 }
 
 async function copyUrl(v, button) {
@@ -225,7 +228,18 @@ function requestPermission() {
 // Init + live updates
 // ---------------------------------------------------------------------------
 async function init() {
-  [activeTab] = await api.tabs.query({ active: true, currentWindow: true });
+  if (forcedTabId) {
+    document.body.classList.add('tab-mode');
+    activeTab = await api.tabs.get(forcedTabId).catch(() => null);
+    if (!activeTab) {
+      $('empty').hidden = false;
+      $('empty').textContent = 'That tab is no longer open.';
+      return;
+    }
+    document.title = `Videos – ${activeTab.title || 'tab ' + forcedTabId}`;
+  } else {
+    [activeTab] = await api.tabs.query({ active: true, currentWindow: true });
+  }
   const [stored, s, granted] = await Promise.all([
     stateArea.get(tabKey(activeTab.id)),
     CVS.getSettings(),
@@ -256,5 +270,9 @@ $('clear').addEventListener('click', async () => {
   await send({ type: 'clearTab', tabId: activeTab.id });
 });
 $('options').addEventListener('click', () => api.runtime.openOptionsPage());
+$('diagnostics').addEventListener('click', () => {
+  api.tabs.create({ url: api.runtime.getURL('options.html#diagnostics') });
+  if (!forcedTabId) window.close();
+});
 
 init();

@@ -41,6 +41,31 @@
     </div>
   </form>
 
+  <section id="diagnostics" class="panel">
+    <h2>Diagnostics</h2>
+    <p class="muted">If nothing shows up while a video plays, this shows what the extension
+      actually sees. URLs are shown without their query strings (which often contain sign-in tokens).</p>
+    <ul id="diagStatus" class="diag-status"></ul>
+
+    <h2>Tabs with detected videos</h2>
+    <p class="muted">Use <strong>Open list</strong> if the toolbar popup doesn't display.</p>
+    <ul id="diagTabs" class="diag-tabs"></ul>
+
+    <h2>Recent media requests</h2>
+    <div class="row">
+      <button id="diagRefresh" type="button">Refresh</button>
+      <button id="diagCopy" type="button">Copy report</button>
+      <button id="diagClear" type="button">Clear</button>
+      <span id="diagMsg" class="muted" aria-live="polite"></span>
+    </div>
+    <div class="diag-table-wrap">
+      <table class="diag-table">
+        <thead><tr><th>Time</th><th>Result</th><th>Type</th><th>Content-Type</th><th>URL</th></tr></thead>
+        <tbody id="diagRows"></tbody>
+      </table>
+    </div>
+  </section>
+
   <section class="panel">
     <h2>Acceptable use</h2>
     <p>Use this only for courses you are enrolled in, for your own offline study, and follow your

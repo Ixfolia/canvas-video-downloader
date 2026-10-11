@@ -48,3 +48,13 @@ pre { padding: 8px 10px; overflow-x: auto; white-space: pre-wrap; word-break: br
 .msg.warn { background: var(--warn-bg); color: var(--warn-fg); }
 .msg.ok { color: var(--ok); border: 1px solid var(--ok); }
 .muted { color: var(--muted); }
+
+.diag-status, .diag-tabs { margin: 8px 0; padding-left: 18px; }
+.diag-status li, .diag-tabs li { margin: 4px 0; word-break: break-word; }
+.diag-table-wrap { overflow-x: auto; margin-top: 10px; }
+.diag-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.diag-table th, .diag-table td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.diag-table td:last-child { word-break: break-all; }
+.diag-table .listed { color: var(--ok); font-weight: 600; }
+.good { color: var(--ok); }
+.bad { color: var(--err-fg); }

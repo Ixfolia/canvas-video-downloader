@@ -168,6 +168,12 @@ The check uses the **tab's page address**, not the video host, so embedded Kaltu
 - In Chrome **incognito**, the extension must be allowed in incognito. Downloads then use the normal profile's cookies, so cookie-protected media may fail. Firefox private windows are handled through the `incognito` download option.
 - Very rarely, a non-video request with a video Content-Type, or a DASH-style segment URL, can be listed. Ignore it, or press **Clear list**.
 
+## Troubleshooting
+- **The popup is a tiny blank white box, or nothing is detected.** Check that the folder you loaded keeps the layout shown in the file tree, with `lib/common.js` and `icons/` as subfolders next to `manifest.json`. Firefox shows a blank box when it can't load `popup.html`.
+- **Options → Diagnostics** shows whether site access is granted and whether the background script responds. It also lists every video-like request the extension saw, with why it was listed or ignored. **Copy report** copies that as text. URLs appear without their query strings.
+- **Options → Diagnostics → Open list** shows a tab's videos in a normal tab. Use it if the toolbar popup won't display.
+- To see errors in Firefox, open `about:debugging` → **Inspect** → Console. In Chrome, open `chrome://extensions` → **service worker**.
+
 ## Development
 ```bash
 npm test               # unit tests (Node 18+): filenames, keys, HLS parser, MP4 DRM sniffing

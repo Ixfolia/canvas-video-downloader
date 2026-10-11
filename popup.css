@@ -92,3 +92,7 @@ button.link { border: 0; background: none; color: var(--accent); padding: 0; }
 .banner button { margin-top: 6px; }
 .empty { color: var(--muted); text-align: center; padding: 18px 8px; }
 .hint { display: block; margin-top: 8px; font-size: 12px; }
+
+/* popup.html?tabId=N opened as a normal tab */
+body.tab-mode { width: auto; max-width: 640px; max-height: none; margin: 16px auto; }
+body.tab-mode main { max-height: none; }

@@ -69,7 +69,12 @@ let settings = { ...CVS.DEFAULT_SETTINGS };
 let hydrated = null;
 
 function ready() {
-  return (hydrated ??= hydrate());
+  // If hydration fails (e.g. storage hiccup), don't cache the failure: the
+  // next event retries, and this one proceeds with an empty cache.
+  return (hydrated ??= hydrate().catch((e) => {
+    console.warn('[CVS] hydrate failed', e);
+    hydrated = null;
+  }));
 }
 
 async function hydrate() {
@@ -85,6 +90,7 @@ async function hydrate() {
     else stale.push(k);
   }
   if (stale.length) await stateArea.remove(stale);
+  if (all.diag?.entries) diag.entries = all.diag.entries.concat(diag.entries).slice(-DIAG_MAX);
 }
 
 // All state mutations go through this queue so that concurrent events (a
@@ -225,6 +231,60 @@ async function fetchWithTimeout(url, init = {}, ms = 15000) {
 }
 
 // ---------------------------------------------------------------------------
+// Diagnostics
+// A small ring buffer of media-looking requests and what we decided about
+// them, shown on the options page so problems on real sites can be debugged
+// without DevTools. Query strings are dropped (they often hold signed tokens).
+// ---------------------------------------------------------------------------
+const DIAG_MAX = 60;
+const diag = { startedAt: Date.now(), responses: 0, entries: [] };
+let diagTimer = null;
+
+const MEDIA_EXT_RE = /\.(mp4|m4v|webm|mov|m3u8|mpd|ts|m4s|m4f|cmfv|cmfa|aac|m4a|mp3)$/i;
+
+function looksLikeMedia(d) {
+  const ct = (headerMap(d.responseHeaders)['content-type'] || '').toLowerCase();
+  let path = '';
+  try {
+    path = new URL(d.url).pathname;
+  } catch {}
+  return /^(video|audio)\/|mpegurl|dash\+xml/.test(ct) || MEDIA_EXT_RE.test(path);
+}
+
+function urlForDiag(url) {
+  try {
+    const u = new URL(url);
+    return u.origin + u.pathname;
+  } catch {
+    return String(url).split('?')[0];
+  }
+}
+
+function note(d, verdict, ct) {
+  if (!verdict) return;
+  let url = urlForDiag(d.url);
+  // Collapse segments of one stream into a single "dir/*.ext" line.
+  if (/segment/.test(verdict)) url = url.replace(/\/[^/]*$/, '/*' + (CVS.extOf(d.url) ? '.' + CVS.extOf(d.url) : ''));
+  const id = `${d.tabId}|${verdict}|${url}`;
+  const existing = diag.entries.find((e) => e.id === id);
+  if (existing) {
+    existing.count++;
+    existing.time = Date.now();
+  } else {
+    diag.entries.push({
+      id, url, verdict, count: 1, time: Date.now(), tabId: d.tabId, type: d.type, status: d.statusCode,
+      contentType: (ct ?? headerMap(d.responseHeaders)['content-type'] ?? '').split(';')[0],
+    });
+    if (diag.entries.length > DIAG_MAX) diag.entries.shift();
+  }
+  // Throttled write so a stream of segments doesn't hammer storage.
+  diagTimer ??= setTimeout(() => {
+    diagTimer = null;
+    stateArea.set({ diag }).catch(() => {});
+  }, 1000);
+}
+
+// ---------------------------------------------------------------------------
 // Network observation
 //
 // All listeners are NON-BLOCKING ("responseHeaders" only, no "blocking" /
@@ -240,7 +300,14 @@ const ALL_URLS = { urls: ['<all_urls>'] };
 api.webRequest.onResponseStarted.addListener(onResponseStarted, ALL_URLS, ['responseHeaders']);
 
 function onResponseStarted(d) {
-  if (d.tabId < 0 || fromOurExtension(d)) return; // background fetches / our own HLS page
+  diag.responses++;
+  if (fromOurExtension(d)) return; // our own HLS page / probe
+  if (d.tabId < 0) {
+    // Background fetches, and in Firefox also requests made by a page's
+    // service worker. Logged so the diagnostics page can reveal the latter.
+    if (looksLikeMedia(d)) note(d, 'not linked to a tab (service worker?) - ignored');
+    return;
+  }
 
   if (d.type === 'main_frame') {
     // A new document is replacing the page: forget the old page's videos.
@@ -253,6 +320,7 @@ function onResponseStarted(d) {
   }
 
   if ((d.type === 'xmlhttprequest' || d.type === 'other') && DRM_URL_RE.test(d.url)) {
+    note(d, 'DRM licence request - tab marked protected');
     serial(() => {
       const st = ensureTab(d.tabId);
       if (!st.drm) {
@@ -264,10 +332,18 @@ function onResponseStarted(d) {
   }
 
   if (IGNORED_TYPES.has(d.type)) return;
-  if (d.statusCode < 200 || d.statusCode >= 300) return;
+  const media = looksLikeMedia(d);
+  if (d.statusCode < 200 || d.statusCode >= 300) {
+    if (media) note(d, `HTTP ${d.statusCode} - ignored`);
+    return;
+  }
 
   const host = hostOf(d.url);
-  if (!host || isIgnoredHost(host)) return;
+  if (!host) return;
+  if (isIgnoredHost(host)) {
+    if (media) note(d, 'YouTube - not supported');
+    return;
+  }
 
   const h = headerMap(d.responseHeaders);
   const ct = (h['content-type'] || '').toLowerCase();
@@ -275,16 +351,26 @@ function onResponseStarted(d) {
 
   // HLS/DASH segments and audio-only parts: we only want the playlist or the
   // whole file, never the hundreds of small pieces a player streams.
-  if (CVS.SEGMENT_EXTS.includes(ext)) return;
-  if (/^video\/(mp2t|iso\.segment)|^audio\//.test(ct)) return;
+  if (ext === 'mpd' || ct.includes('dash+xml')) return note(d, 'DASH manifest - not supported', ct);
+  if (CVS.SEGMENT_EXTS.includes(ext) || /^video\/(mp2t|iso\.segment)|^audio\//.test(ct)) {
+    return note(d, 'stream segment - ignored (playlist is used instead)', ct);
+  }
 
   const kind = CVS.kindFrom(d.url, ct);
-  if (!kind) return;
+  if (!kind) {
+    if (media) note(d, `not a video (Content-Type "${ct || 'none'}")`, ct);
+    return;
+  }
 
-  if (kind !== 'hls' && !ext && SEGMENT_PATH_RE.test(new URL(d.url).pathname)) return;
+  if (kind !== 'hls' && !ext && SEGMENT_PATH_RE.test(new URL(d.url).pathname)) {
+    return note(d, 'looks like a stream segment - ignored', ct);
+  }
 
-  const size = totalSizeFromHeaders((n) => h[n], d.statusCode);
-  if (kind !== 'hls' && size != null && size < MIN_VIDEO_BYTES) return;
+  // A playlist's Content-Length is the size of the text file, not the video.
+  const size = kind === 'hls' ? null : totalSizeFromHeaders((n) => h[n], d.statusCode);
+  if (kind !== 'hls' && size != null && size < MIN_VIDEO_BYTES) {
+    return note(d, `too small (${CVS.formatBytes(size)}) - ignored`, ct);
+  }
 
   serial(() =>
     recordVideo(d.tabId, {
@@ -294,14 +380,14 @@ function onResponseStarted(d) {
       ranged: d.statusCode === 206 || !!h['content-range'],
       contentType: ct.split(';')[0],
       source: hostOf(d.documentUrl || d.initiator || d.originUrl || ''),
-    }),
+    }).then((verdict) => note(d, verdict, ct)),
   );
 }
 
 async function recordVideo(tabId, info) {
   const st = ensureTab(tabId);
   if (!st.pageUrl || !st.title) await refreshPageInfo(st);
-  if (!CVS.pageAllowed(st.pageUrl, settings)) return;
+  if (!CVS.pageAllowed(st.pageUrl, settings)) return 'page not allowed by restricted mode - ignored';
 
   const key = CVS.videoKey(info.url);
   const existing = st.videos.find((v) => v.key === key);
@@ -322,9 +408,9 @@ async function recordVideo(tabId, info) {
       changed = true;
     }
     if (changed) persist(tabId);
-    return;
+    return existing.parent ? 'listed (hidden: quality variant of a master playlist)' : 'listed';
   }
-  if (st.videos.length >= MAX_VIDEOS_PER_TAB) return;
+  if (st.videos.length >= MAX_VIDEOS_PER_TAB) return 'too many videos on this tab - ignored';
 
   const v = {
     key,
@@ -343,6 +429,7 @@ async function recordVideo(tabId, info) {
   persist(tabId);
 
   if (v.kind === 'hls') classifyHls(tabId, key, info.url); // not awaited: runs outside the queue
+  return 'listed';
 }
 
 /**
@@ -598,6 +685,23 @@ api.downloads.onChanged.addListener((delta) => {
 // Messages from our own pages (popup, options, hls downloader)
 // ---------------------------------------------------------------------------
 const handlers = {
+  ping: async () => {
+    await ready();
+    return {
+      ok: true,
+      version: api.runtime.getManifest().version,
+      startedAt: diag.startedAt,
+      responses: diag.responses,
+      tabs: [...tabStates.values()].map((st) => ({
+        tabId: st.tabId, pageUrl: urlForDiag(st.pageUrl), title: st.title, drm: st.drm, count: visibleVideos(st).length,
+      })),
+    };
+  },
+  clearDiag: async () => {
+    diag.entries = [];
+    await stateArea.set({ diag });
+    return { ok: true };
+  },
   download: (msg) => downloadVideo(msg),
   clearTab: (msg) =>
     serial(() => {
