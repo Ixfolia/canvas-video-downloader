@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Save HLS video – Canvas Video Saver</title>
+  <link rel="stylesheet" href="page.css">
+</head>
+<body>
+  <h1>Save HLS video</h1>
+  <p id="name" class="sub"></p>
+
+  <section class="panel">
+    <div id="setup" hidden>
+      <label for="variant">Quality</label>
+      <select id="variant"></select>
+      <p id="audioNote" class="muted" hidden></p>
+      <p id="estimate" class="muted"></p>
+      <div class="row">
+        <button id="start" class="primary" type="button">Start download</button>
+      </div>
+    </div>
+
+    <div id="progressBox" hidden>
+      <div id="progressLabel"></div>
+      <progress id="progress" max="1" value="0"></progress>
+      <div class="row">
+        <button id="cancel" type="button">Cancel</button>
+      </div>
+    </div>
+
+    <div id="message" class="msg" hidden></div>
+    <div id="after" hidden></div>
+  </section>
+
+  <p class="muted">
+    Keep this tab open until the download finishes. Segments are fetched with your
+    own browser session and joined locally; nothing is sent anywhere else.
+  </p>
+
+  <script src="lib/common.js"></script>
+  <script src="hls.js"></script>
+</body>
+</html>

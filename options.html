@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Canvas Video Saver – Options</title>
+  <link rel="stylesheet" href="page.css">
+</head>
+<body>
+  <h1>Canvas Video Saver</h1>
+  <p class="sub">Options. Everything is stored locally in your browser.</p>
+
+  <section id="permPanel" class="panel" hidden>
+    <h2>Site access</h2>
+    <p>The extension needs permission to see network responses on websites so it can notice the
+      video files your course pages load. It is not granted yet.</p>
+    <button id="grant" class="primary" type="button">Grant site access</button>
+  </section>
+
+  <form id="form" class="panel">
+    <h2>Which pages to watch</h2>
+    <label><input type="radio" name="hostMode" value="all"> All sites (default)</label>
+    <label><input type="radio" name="hostMode" value="restricted">
+      Only Canvas pages: <code>*.instructure.com</code> plus the domains below</label>
+
+    <label for="domains">Custom domains (one per line, e.g. <code>canvas.myschool.edu</code> or <code>*.myschool.edu</code>)</label>
+    <textarea id="domains" spellcheck="false" placeholder="canvas.myschool.edu"></textarea>
+    <p class="muted">
+      The check is made against the address of the <em>page in the tab</em>, not the video server,
+      so embedded players (Canvas Studio, Kaltura, Panopto) on an allowed course page are still detected
+      even though their video files come from other hosts.
+    </p>
+
+    <h2>Downloads</h2>
+    <label><input type="checkbox" id="saveAs"> Ask where to save each file</label>
+    <p class="muted">Files are saved to <code>Downloads/CanvasVideos/</code> by default.</p>
+
+    <div class="row">
+      <button class="primary" type="submit">Save</button>
+      <span id="saved" class="muted" aria-live="polite"></span>
+    </div>
+  </form>
+
+  <section class="panel">
+    <h2>Acceptable use</h2>
+    <p>Use this only for courses you are enrolled in, for your own offline study, and follow your
+      school's acceptable-use and copyright policies. Protected (DRM / encrypted) videos are never downloaded.</p>
+  </section>
+
+  <script src="lib/common.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

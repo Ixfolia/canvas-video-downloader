@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Canvas Video Saver</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="bar">
+    <h1>Canvas Video Saver</h1>
+    <span id="count" class="count" aria-live="polite"></span>
+  </header>
+
+  <div id="banners"></div>
+
+  <main>
+    <ul id="list" class="list" aria-label="Detected videos"></ul>
+    <p id="empty" class="empty" hidden>
+      No videos detected on this tab yet.<br>
+      Press <strong>play</strong> on the video for a few seconds &mdash; this list updates live.
+      <span class="hint">Opened the page before installing the extension? Reload it.</span>
+    </p>
+  </main>
+
+  <footer class="bar foot">
+    <button id="clear" class="link" type="button">Clear list</button>
+    <button id="options" class="link" type="button">Options</button>
+  </footer>
+
+  <script src="lib/common.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "canvas-video-saver",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cross-browser MV3 extension that saves Canvas LMS course videos you are already watching, for personal offline study.",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "package": "node scripts/package.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "lint:firefox": "npx web-ext lint --source-dir dist/firefox"
+  },
+  "license": "MIT"
+}
